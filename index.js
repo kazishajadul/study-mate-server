@@ -1,76 +1,75 @@
-require('dotenv').config();
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
+import express from "express";
+import mongoose from "mongoose";
+import cors from "cors";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const app = express();
+const port = process.env.PORT || 5000;
 
-// Middleware
+app.use(cors());
 app.use(express.json());
 
-// --- Configuration ---
-const MONGO_URI =
-  process.env.MONGO_URI ||
-  'mongodb+srv://studymate:pTiEnGyQAh8UIveU@kazirafan.f2skk7f.mongodb.net/StudyMateDB?retryWrites=true&w=majority';
-
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
-app.use(cors({ origin: CLIENT_ORIGIN }));
-
-// --- Connect to MongoDB ---
+// MongoDB connection
 mongoose
-  .connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => {
-    console.log('MongoDB connected');
-    console.log(`Connected to database: ${mongoose.connection.name}`);
-  })
-  .catch((err) => {
-    console.error(' MongoDB connection error:', err.message);
-    process.exit(1);
-  });
+  .connect(process.env.MONGO_URI, { dbName: "studymate" })
+  .then(() => console.log("✅ Connected to MongoDB"))
+  .catch((err) => console.error("❌ MongoDB Connection Failed:", err));
 
-// --- Mongoose Schemas ---
-const { Schema, model } = mongoose;
-
-const PartnerSchema = new Schema(
+// Partner Schema
+const partnerSchema = new mongoose.Schema(
   {
-    id: { type: String },
-    name: { type: String, required: true },
-    profileimage: { type: String, default: '' },
-    subject: { type: String, required: true },
-    studyMode: { type: String, enum: ['Online', 'Offline'], default: 'Online' },
-    availabilityTime: { type: String, default: '' },
-    location: { type: String, default: '' },
-    experienceLevel: {
-      type: String,
-      enum: ['Beginner','Intermediate','Expert'],
-      default:'Beginner'
-    },
-    rating: { type: Number, default: 0 },
-    patnerCount: { type: Number, default: 0 },
-    email: { type: String, required: true },
+    id: String,
+    name: String,
+    profileimage: String,
+    subject: String,
+    studyMode: String,
+    availabilityTime: String,
+    location: String,
+    experienceLevel: String,
+    rating: Number,
+    patnerCount: Number,
+    email: String,
   },
-  { timestamps: true }
+  { versionKey: false }
 );
 
+// ⚠ Specify the exact collection name to match MongoDB
+const Partner = mongoose.model("Partner", partnerSchema, "StudyMateDB");
 
-const Partner = model('Partner', PartnerSchema);
+// Home route
+app.get("/", (req, res) => {
+  res.json({ status: "success", message: "StudyMate Server Running" });
+});
 
-
-// Get all partners
-app.get('/api/partners', async (req, res) => {
+// GET all tutors
+app.get("/apps", async (req, res) => {
   try {
-    const partners = await Partner.find({}).sort({ rating: -1, createdAt: -1 });
-    res.json({ success: true, data: partners });
+    const apps = await Partner.find({});
+    res.json({ success: true, data: apps });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({ success: false, error: "Failed to fetch apps" });
   }
 });
 
+// GET single tutor by custom id
+app.get("/apps/:id", async (req, res) => {
+  const id = req.params.id;
+  try {
+    const app = await Partner.findOne({ id: id }); // search by your string "id"
+    if (!app) return res.status(404).json({ success: false, error: "App not found" });
+    res.json({ success: true, data: app });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, error: "Server error" });
+  }
+});
 
-app.get('/', (req, res) => res.send('StudyMate server is running 🚀'));
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ status: 404, error: "API Not Found" });
+});
 
-
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`⚙️ Server running on port ${PORT}`));
-
+app.listen(port, () => console.log(`🌐 Server running on http://localhost:${port}`));
